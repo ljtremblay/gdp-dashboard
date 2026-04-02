@@ -3,63 +3,58 @@ import pandas as pd
 from datetime import datetime
 import os
 
-# --- CONFIGURATION & DB ---
-DB_FILE = "athletes_data.csv"
+# --- GESTION DE LA BASE DE DONNÉES LOCALE ---
+DB_FILE = "evaluations_mobilite.csv"
 
-def save_data(data):
+def load_data():
+    if os.path.exists(DB_FILE):
+        return pd.read_csv(DB_FILE)
+    return pd.DataFrame()
+
+def save_entry(data):
     df = pd.DataFrame([data])
     if not os.path.isfile(DB_FILE):
         df.to_csv(DB_FILE, index=False)
     else:
         df.to_csv(DB_FILE, mode='a', header=False, index=False)
 
-# --- UI CONFIG ---
-st.set_page_config(page_title="Performance Lab", layout="wide")
+# --- CONFIGURATION DE L'INTERFACE ---
+st.set_page_config(page_title="Performance Lab - Mobility", layout="wide")
 
-# --- SIDEBAR : GESTION ATHLÈTE ---
-st.sidebar.header("👤 Profil Athlète")
-nom = st.sidebar.text_input("Nom")
-prenom = st.sidebar.text_input("Prénom")
-dob = st.sidebar.date_input("Date de Naissance (DOB)", min_value=datetime(1970, 1, 1))
+# --- BARRE LATÉRALE : GESTION DES ATHLÈTES ---
+st.sidebar.header("📋 Gestion des Athlètes")
+data_load = load_data()
 
-athlete_id = f"{nom}_{prenom}_{dob}".replace(" ", "_").lower()
+if not data_load.empty:
+    # Nettoyage et préparation de la liste des athlètes
+    data_load['full_name'] = data_load['prenom'].astype(str) + " " + data_load['nom'].astype(str)
+    liste_athletes = ["+ Ajouter un nouvel athlète"] + sorted(data_load['full_name'].unique().tolist())
+else:
+    liste_athletes = ["+ Ajouter un nouvel athlète"]
 
-# --- MAIN INTERFACE ---
-st.title("🚀 Évaluation Mobilité Haute Performance")
+choix_athlete = st.sidebar.selectbox("Sélectionner un athlète", liste_athletes)
+
+if choix_athlete == "+ Ajouter un nouvel athlète":
+    st.sidebar.subheader("Nouveau Profil")
+    nom = st.sidebar.text_input("Nom")
+    prenom = st.sidebar.text_input("Prénom")
+    dob = st.sidebar.date_input("Date de Naissance", min_value=datetime(1950, 1, 1), value=datetime(2000, 1, 1))
+    is_new = True
+else:
+    # Récupérer les infos de l'athlète sélectionné
+    info = data_load[data_load['full_name'] == choix_athlete].iloc[0]
+    nom = info['nom']
+    prenom = info['prenom']
+    dob = info['dob']
+    st.sidebar.success(f"Profil actif : {prenom} {nom}")
+    st.sidebar.info(f"Né(e) le : {dob}")
+    is_new = False
+
+# --- INTERFACE PRINCIPALE ---
+st.title(f"🚀 Évaluation : {prenom} {nom}" if nom else "🚀 Lab de Mobilité")
 
 if not nom or not prenom:
-    st.warning("⚠️ Veuillez entrer le nom et le prénom de l'athlète dans la barre latérale pour commencer.")
-    st.stop()
-
-# --- INPUTS ---
-col1, col2 = st.columns(2)
-
-with col1:
-    st.header("🦵 Membres Inférieurs")
-    c1, c2 = st.columns(2)
-    h_ri_g = c1.number_input("Hanche RI Gauche", value=35)
-    h_re_g = c2.number_input("Hanche RE Gauche", value=45)
-    h_ri_d = c1.number_input("Hanche RI Droite", value=35)
-    h_re_d = c2.number_input("Hanche RE Droite", value=45)
-    
-    ch_g = c1.number_input("Cheville Gauche (cm)", value=12.0)
-    ch_d = c2.number_input("Cheville Droite (cm)", value=12.0)
-
-    st.subheader("Thomas Test")
-    t_col1, t_col2 = st.columns(2)
-    t_q_g = t_col1.checkbox("Quad (G)")
-    t_f_g = t_col1.checkbox("Fléchisseurs (G)")
-    t_it_g = t_col1.checkbox("IT Band (G)")
-    t_q_d = t_col2.checkbox("Quad (D)")
-    t_f_d = t_col2.checkbox("Fléchisseurs (D)")
-    t_it_d = t_col2.checkbox("IT Band (D)")
-
-with col2:
-    st.header("💪 Membres Supérieurs")
-    e1, e2 = st.columns(2)
-    e_ri_g = e1.number_input("Épaule RI G", value=60)
-    e_re_g = e2.number_input("Épaule RE G", value=90)
-    e_ri_d = e1.number_input("Épaule RI D", value=60)
+    st.info("👋 Bienvenue Coach ! Veuillez sélectionner un athlète ou en créer un nouveau dans le menu à gauche.")    e_ri_d = e1.number_input("Épaule RI D", value=60)
     e_re_d = e2.number_input("Épaule RE D", value=90)
     
     st.header("🏢 Tronc")
