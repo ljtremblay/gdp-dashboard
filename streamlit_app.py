@@ -1,151 +1,72 @@
 import streamlit as st
-import pandas as pd
-import math
-from pathlib import Path
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
+st.set_page_config(page_title="Athlete Mobility Tracker", layout="wide")
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+st.title("🚀 Évaluation Mobilité Haute Performance")
+st.write("Entrez les mesures pour générer le rapport de Flags.")
 
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
+col1, col2 = st.columns(2)
 
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
-    """
+with col1:
+    st.header("Mesures")
+    # Cheville
+    st.subheader("Cheville (cm)")
+    ch_g = st.number_input("Gauche", value=12.0)
+    ch_d = st.number_input("Droite", value=12.0)
+    
+    # Hanche RI
+    st.subheader("Hanche RI (Degrés)")
+    h_ri_g = st.number_input("Hanche RI G", value=35)
+    h_ri_d = st.number_input("Hanche RI D", value=35)
+    
+    # Épaule RI
+    st.subheader("Épaule RI (Degrés)")
+    e_ri_g = st.number_input("Épaule RI G", value=60)
+    e_ri_d = st.number_input("Épaule RI D", value=60)
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
+with col2:
+    st.header("Tests Qualitatifs")
+    # Thoracique
+    st.subheader("Thoracique (Degrés)")
+    thor_rot = st.slider("Rotation Thoracique", 0, 90, 50)
+    
+    # Thomas Test
+    st.subheader("Thomas Test")
+    thomas_g = st.selectbox("Côté Gauche", ["Green (OK)", "Yellow (Psoas/Droit Fémoral)", "Red (Douleur)"])
+    thomas_d = st.selectbox("Côté Droit", ["Green (OK)", "Yellow (Psoas/Droit Fémoral)", "Red (Douleur)"])
 
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
+# --- ALGORITHME DE DIAGNOSTIC ---
+st.divider()
+st.header("📊 Rapport de Diagnostic")
 
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
+def get_status(val, green, yellow):
+    if val >= green: return "🟢 GREEN", "Normal"
+    if val >= yellow: return "🟡 YELLOW", "Alerte / Compensation"
+    return "🔴 RED", "Priorité Corrective"
 
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
+# Affichage des résultats
+res1, res2, res3, res4, res5 = st.columns(5)
 
-    return gdp_df
+with res1:
+    status, msg = get_status(min(ch_g, ch_d), 12, 10)
+    asym = abs(ch_g - ch_d)
+    if asym > 1.5: status, msg = "🟡 YELLOW", "Asymétrie > 1.5cm"
+    st.metric("Cheville", status, msg)
 
-gdp_df = get_gdp_data()
+with res2:
+    status, msg = get_status(min(h_ri_g, h_ri_d), 35, 25)
+    if abs(h_ri_g - h_ri_d) > 10: status, msg = "🔴 RED", "Asymétrie majeure"
+    st.metric("Hanche RI", status, msg)
 
-# -----------------------------------------------------------------------------
-# Draw the actual page
+with res3:
+    status, msg = get_status(thor_rot, 50, 40)
+    st.metric("Thoracique", status, msg)
 
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
+with res4:
+    status, msg = get_status(min(e_ri_g, e_ri_d), 60, 45)
+    st.metric("Épaule RI", status, msg)
 
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
-
-
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
-cols = st.columns(4)
-
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
-
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
-
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+with res5:
+    t_status = "🟢 GREEN" if "Green" in thomas_g and "Green" in thomas_d else "🟡 YELLOW"
+    if "Red" in thomas_g or "Red" in thomas_d: t_status = "🔴 RED"
+    st.metric("Thomas Test", t_status)
