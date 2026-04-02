@@ -101,3 +101,35 @@ if os.path.exists(DB_FILE):
         st.info("Aucun historique pour cet athlète.")
 else:
     st.info("Base de données vide. Créez la première évaluation !")
+# --- SECTION CONSULTATION DU PASSÉ ---
+if not is_new and not hist.empty:
+    st.divider()
+    st.header(f"🔍 Consultation des évaluations passées")
+    
+    # On crée une liste des dates disponibles pour cet athlète
+    dates_dispo = hist['date'].unique().tolist()
+    date_choisie = st.selectbox("Choisir une date pour voir le détail", sorted(dates_dispo, reverse=True))
+    
+    # On filtre les données pour cette date précise
+    eval_precise = hist[hist['date'] == date_choisie].iloc[0]
+    
+    # Affichage en colonnes des résultats de l'époque
+    c_past1, c_past2, c_past3 = st.columns(3)
+    
+    with c_past1:
+        st.metric("Cheville G/D", f"{eval_precise['ch_g']} / {eval_precise['ch_d']} cm")
+        st.metric("Thoracique G/D", f"{eval_precise['thor_g']}° / {eval_precise['thor_d']}°")
+        
+    with c_past2:
+        st.metric("Hanche RI G/D", f"{eval_precise['h_ri_g']}° / {eval_precise['h_ri_d']}°")
+        st.metric("Épaule RI G/D", f"{eval_precise['e_ri_g']}° / {eval_precise['e_ri_d']}°")
+        
+    with c_past3:
+        st.write("**Flags Thomas Test :**")
+        if eval_precise['t_flags'] == 0:
+            st.success("Aucune raideur")
+        else:
+            st.warning(f"{int(eval_precise['t_flags'])} zone(s) de raideur")
+
+    # Optionnel : Bouton pour comparer avec aujourd'hui
+    st.info(f"💡 Cette évaluation a été réalisée le {date_choisie}. Tu peux voir l'évolution sur le graphique plus haut.")
